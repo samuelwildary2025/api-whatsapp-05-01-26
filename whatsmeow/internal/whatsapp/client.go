@@ -438,8 +438,17 @@ func (m *Manager) ConnectWithPairingCode(instanceID, phoneNumber string) (string
 		return "", fmt.Errorf("already connected")
 	}
 
-	// Clean phone number
+	// Check if already has a session - pairing code only works for new connections
+	if inst.Client.Store.ID != nil {
+		return "", fmt.Errorf("already has a session, use QR code or disconnect first")
+	}
+
+	// Clean phone number - remove + and any spaces/dashes
 	phoneNumber = strings.TrimPrefix(phoneNumber, "+")
+	phoneNumber = strings.ReplaceAll(phoneNumber, " ", "")
+	phoneNumber = strings.ReplaceAll(phoneNumber, "-", "")
+
+	log.Info().Str("instanceId", instanceID).Str("phone", phoneNumber).Msg("Starting pairing code connection")
 
 	inst.mu.Lock()
 	inst.Status = "pairing"
@@ -447,18 +456,34 @@ func (m *Manager) ConnectWithPairingCode(instanceID, phoneNumber string) (string
 
 	// Connect first (required before PairPhone)
 	if !inst.Client.IsConnected() {
+		log.Info().Str("instanceId", instanceID).Msg("Connecting to WhatsApp servers...")
 		err = inst.Client.Connect()
 		if err != nil {
 			inst.mu.Lock()
 			inst.Status = "disconnected"
 			inst.mu.Unlock()
+			log.Error().Err(err).Str("instanceId", instanceID).Msg("Failed to connect to WhatsApp servers")
 			return "", fmt.Errorf("failed to connect: %w", err)
 		}
 	}
 
+	// Wait a bit for connection to stabilize
+	time.Sleep(2 * time.Second)
+
+	// Check if connected
+	if !inst.Client.IsConnected() {
+		inst.mu.Lock()
+		inst.Status = "disconnected"
+		inst.mu.Unlock()
+		return "", fmt.Errorf("failed to establish connection to WhatsApp servers")
+	}
+
+	log.Info().Str("instanceId", instanceID).Msg("Connected, requesting pairing code...")
+
 	// Request pairing code
 	code, err := inst.Client.PairPhone(context.Background(), phoneNumber, true, whatsmeow.PairClientChrome, "Chrome (Mac OS)")
 	if err != nil {
+		log.Error().Err(err).Str("instanceId", instanceID).Str("phone", phoneNumber).Msg("Failed to get pairing code")
 		inst.mu.Lock()
 		inst.Status = "disconnected"
 		inst.mu.Unlock()
@@ -475,7 +500,7 @@ func (m *Manager) ConnectWithPairingCode(instanceID, phoneNumber string) (string
 	inst.PairingCode = formattedCode
 	inst.mu.Unlock()
 
-	log.Info().Str("instanceId", instanceID).Str("code", formattedCode).Msg("Pairing code generated")
+	log.Info().Str("instanceId", instanceID).Str("code", formattedCode).Msg("Pairing code generated successfully")
 
 	// Publish event
 	m.publishEvent(Event{
