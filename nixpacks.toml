@@ -1,0 +1,17 @@
+[phases.setup]
+nixPkgs = ["nodejs", "npm", "git", "openssl", "chromium"]
+
+[phases.build]
+cmds = ["npm ci", "npx prisma generate", "npm run build"]
+
+[start]
+cmd = "npx prisma db push --skip-generate && npm start"
+
+[variables]
+# Puppeteer config for Nixpacks (Debian/Ubuntu based usually)
+# We let Puppeteer download its compatible revision to ensure stability, 
+# unless we are sure about the system chromium path. 
+# However, to save space, we can try to use system chromium if found.
+# For safety in this "fix", I will let it download (commented out SKIP)
+# PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+NODE_ENV = "production"

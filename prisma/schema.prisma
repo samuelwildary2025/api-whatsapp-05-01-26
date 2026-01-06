@@ -1,0 +1,215 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================
+// Enums
+// ================================
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum InstanceStatus {
+  DISCONNECTED
+  CONNECTING
+  CONNECTED
+  BANNED
+}
+
+enum CampaignStatus {
+  PENDING
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// ================================
+// Models
+// ================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(USER)
+  
+  instances Instance[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Instance {
+  id            String         @id @default(uuid())
+  name          String
+  token         String         @unique @default(uuid())
+  status        InstanceStatus @default(DISCONNECTED)
+  
+  // WhatsApp Info (populated after connection)
+  waNumber      String?
+  waName        String?
+  waPicture     String?
+  
+  // Webhook configuration
+  webhookUrl    String?
+  webhookEvents String[]       @default([])
+
+  // Proxy Configuration
+  proxyHost     String?
+  proxyPort     String?
+  proxyUsername String?
+  proxyPassword String?
+  proxyProtocol String?        @default("http")
+  
+  // Owner
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Behavior Settings
+  alwaysOnline    Boolean        @default(false)
+  ignoreGroups    Boolean        @default(false)
+  rejectCalls     Boolean        @default(false)
+  readMessages    Boolean        @default(false)
+  syncFullHistory Boolean        @default(false)
+  
+  // Relations
+  campaigns     Campaign[]
+  labels        Label[]
+  quickReplies  QuickReply[]
+  
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("instances")
+}
+
+model Campaign {
+  id          String         @id @default(uuid())
+  name        String
+  status      CampaignStatus @default(PENDING)
+  
+  // Configuration
+  delay       Int            @default(5000) // delay between messages in ms
+  
+  // Stats
+  totalMessages   Int        @default(0)
+  sentMessages    Int        @default(0)
+  failedMessages  Int        @default(0)
+  
+  // Relations
+  instanceId  String
+  instance    Instance       @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("campaigns")
+}
+
+model Message {
+  id         String        @id @default(uuid())
+  
+  // Recipient
+  to         String
+  
+  // Content (JSON with type and data)
+  content    Json
+  
+  // Status tracking
+  status     MessageStatus @default(PENDING)
+  errorMsg   String?
+  
+  // WhatsApp message ID (after sent)
+  waMessageId String?
+  
+  // Campaign relation (optional - can be standalone message)
+  campaignId String?
+  campaign   Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  sentAt     DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@map("messages")
+}
+
+model Label {
+  id         String   @id @default(uuid())
+  name       String
+  color      String   @default("#000000")
+  
+  instanceId String
+  instance   Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("labels")
+}
+
+model QuickReply {
+  id         String   @id @default(uuid())
+  shortcut   String
+  message    String
+  
+  instanceId String
+  instance   Instance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([instanceId, shortcut])
+  @@map("quick_replies")
+}
+
+model GlobalSettings {
+  id              String   @id @default("global")
+  
+  // Global webhook (receives all events from all instances)
+  webhookUrl      String?
+  webhookEvents   String[] @default([])
+  
+  // Limits
+  maxInstances    Int      @default(10)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("global_settings")
+}
+
+// WhatsApp Session Storage (for RemoteAuth)
+model Session {
+  id         String   @id
+  data       String   @db.Text  // Session data (base64 encoded zip)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("sessions")
+}
+

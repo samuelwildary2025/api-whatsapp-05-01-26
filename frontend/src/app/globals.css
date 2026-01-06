@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark Mode Palette (Zinc based) */
+  --background: #09090b;
+  --foreground: #e4e4e7;
+  /* Zinco 200 - Melhor leitura que branco puro */
+
+  --card: #121214;
+  /* Mais escuro que o anterior, melhor contraste */
+  --card-foreground: #fafafa;
+
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+
+  --primary: #22c55e;
+  --primary-foreground: #f7f7f7;
+  /* Texto escuro no botão verde para contraste */
+
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+
+  --muted: #eeeeee;
+  --muted-foreground: #e4e4e4;
+
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #22c55e;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-[var(--border)];
+  }
+
+  body {
+    @apply bg-[var(--background)] text-[var(--foreground)];
+  }
+}
+
+@layer components {
+
+  /* Modern Card Style */
+  .card {
+    @apply bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:border-[var(--primary)]/30 hover:bg-[var(--secondary)]/10 hover:-translate-y-0.5;
+  }
+
+  /* Button Styles */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 shadow-[0_0_15px_rgba(34,197,94,0.3)];
+  }
+
+  .btn-secondary {
+    @apply bg-[var(--secondary)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]/80 border border-[var(--border)];
+  }
+
+  .btn-danger {
+    @apply bg-[var(--destructive)] text-[var(--destructive-foreground)] hover:bg-[var(--destructive)]/90;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)];
+  }
+
+  /* Status Indicators */
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full ring-2 ring-[var(--card)];
+  }
+
+  .status-connected {
+    @apply bg-[var(--primary)] shadow-[0_0_8px_rgba(34,197,94,0.6)];
+  }
+
+  .status-connecting {
+    @apply bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)];
+  }
+
+  .status-disconnected {
+    @apply bg-[var(--destructive)];
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
