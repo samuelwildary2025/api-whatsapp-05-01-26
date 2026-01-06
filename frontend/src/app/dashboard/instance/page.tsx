@@ -84,6 +84,11 @@ function InstanceDetailContent() {
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'test' | 'settings'>('overview');
 
+    // Connection Method State
+    const [connectionMethod, setConnectionMethod] = useState<'qr' | 'code'>('qr');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [pairingCode, setPairingCode] = useState('');
+
     // Settings State
     const [settings, setSettings] = useState<InstanceSettings>({
         alwaysOnline: false,
@@ -269,9 +274,25 @@ function InstanceDetailContent() {
 
     const handleConnect = async () => {
         setConnecting(true);
+        setPairingCode('');
         try {
-            const response = await api.connectInstance(id);
-            toast.success('Conectando... Escaneie o QR Code');
+            if (connectionMethod === 'code') {
+                // Connect with pairing code
+                if (!phoneNumber.trim()) {
+                    toast.error('Digite o número de telefone');
+                    setConnecting(false);
+                    return;
+                }
+                const response = await api.connectWithPairingCode(id, phoneNumber);
+                if (response.data?.pairingCode) {
+                    setPairingCode(response.data.pairingCode);
+                    toast.success('Código gerado! Digite-o no WhatsApp');
+                }
+            } else {
+                // Connect with QR code
+                await api.connectInstance(id);
+                toast.success('Conectando... Escaneie o QR Code');
+            }
             loadInstance();
 
             // Start polling for status
@@ -283,6 +304,7 @@ function InstanceDetailContent() {
                     if (statusData.status === 'connected') {
                         clearInterval(poll);
                         toast.success('Conectado com sucesso!');
+                        setPairingCode('');
                     }
                 }
             }, 3000);
@@ -585,20 +607,75 @@ function InstanceDetailContent() {
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {instance.qrCode ? (
-                                        <div className="bg-white p-4 rounded-lg">
-                                            <img
-                                                src={instance.qrCode}
-                                                alt="QR Code"
-                                                className="w-full max-w-xs mx-auto mix-blend-multiply"
-                                            />
-                                        </div>
+                                    {/* Connection Method Toggle */}
+                                    <div className="flex gap-2 p-1 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                                        <button
+                                            onClick={() => { setConnectionMethod('qr'); setPairingCode(''); }}
+                                            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${connectionMethod === 'qr'
+                                                    ? 'bg-[var(--primary)] text-white'
+                                                    : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                                                }`}
+                                        >
+                                            QR Code
+                                        </button>
+                                        <button
+                                            onClick={() => { setConnectionMethod('code'); }}
+                                            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${connectionMethod === 'code'
+                                                    ? 'bg-[var(--primary)] text-white'
+                                                    : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                                                }`}
+                                        >
+                                            Código
+                                        </button>
+                                    </div>
+
+                                    {connectionMethod === 'qr' ? (
+                                        /* QR Code Display */
+                                        instance.qrCode ? (
+                                            <div className="bg-white p-4 rounded-lg">
+                                                <img
+                                                    src={instance.qrCode}
+                                                    alt="QR Code"
+                                                    className="w-full max-w-xs mx-auto mix-blend-multiply"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="p-8 text-center bg-[var(--background)] rounded-lg border border-dashed border-[var(--border)]">
+                                                <WifiOff className="w-12 h-12 mx-auto mb-4 text-[var(--muted)]" />
+                                                <p className="text-[var(--muted)]">
+                                                    Clique em conectar para gerar o QR Code
+                                                </p>
+                                            </div>
+                                        )
                                     ) : (
-                                        <div className="p-8 text-center bg-[var(--background)] rounded-lg border border-dashed border-[var(--border)]">
-                                            <WifiOff className="w-12 h-12 mx-auto mb-4 text-[var(--muted)]" />
-                                            <p className="text-[var(--muted)]">
-                                                Clique em conectar para gerar o QR Code
-                                            </p>
+                                        /* Pairing Code Method */
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium mb-2">
+                                                    Número de Telefone (com DDI)
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    placeholder="5511999999999"
+                                                    value={phoneNumber}
+                                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2"
+                                                />
+                                            </div>
+
+                                            {pairingCode && (
+                                                <div className="p-6 bg-[var(--primary)]/10 rounded-lg text-center">
+                                                    <p className="text-sm text-[var(--muted)] mb-2">
+                                                        Digite este código no WhatsApp:
+                                                    </p>
+                                                    <p className="text-4xl font-bold tracking-widest text-[var(--primary)]">
+                                                        {pairingCode}
+                                                    </p>
+                                                    <p className="text-xs text-[var(--muted)] mt-3">
+                                                        WhatsApp &gt; Configurações &gt; Aparelhos conectados &gt; Vincular por número
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
@@ -615,12 +692,12 @@ function InstanceDetailContent() {
                                         ) : (
                                             <>
                                                 <Wifi className="w-4 h-4 mr-2" />
-                                                Conectar
+                                                {connectionMethod === 'code' ? 'Gerar Código' : 'Conectar'}
                                             </>
                                         )}
                                     </button>
 
-                                    {instance.qrCode && (
+                                    {connectionMethod === 'qr' && instance.qrCode && (
                                         <p className="text-center text-xs text-[var(--muted)]">
                                             Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho
                                         </p>

@@ -93,6 +93,46 @@ func (h *Handlers) ConnectInstance(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ConnectWithCodeRequest represents pairing code request
+type ConnectWithCodeRequest struct {
+	PhoneNumber string `json:"phoneNumber"`
+}
+
+// ConnectWithCode connects an instance using pairing code
+func (h *Handlers) ConnectWithCode(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceID := vars["id"]
+
+	var req ConnectWithCodeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.PhoneNumber == "" {
+		errorResponse(w, http.StatusBadRequest, "phoneNumber is required")
+		return
+	}
+
+	// Clean phone number
+	phoneNumber := cleanPhoneNumber(req.PhoneNumber)
+
+	log.Info().Str("instanceId", instanceID).Str("phone", phoneNumber).Msg("Connecting with pairing code")
+
+	code, err := h.manager.ConnectWithPairingCode(instanceID, phoneNumber)
+	if err != nil {
+		log.Error().Err(err).Str("instanceId", instanceID).Msg("Failed to get pairing code")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]interface{}{
+		"status":      "pairing",
+		"pairingCode": code,
+		"message":     "Enter this code in WhatsApp > Settings > Linked Devices > Link a Device",
+	})
+}
+
 // DisconnectInstance disconnects an instance
 func (h *Handlers) DisconnectInstance(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

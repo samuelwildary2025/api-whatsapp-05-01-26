@@ -35,6 +35,7 @@ type Instance struct {
 	Status       string
 	QRCode       string
 	QRCodeBase64 string
+	PairingCode  string
 	WANumber     string
 	WAName       string
 	mu           sync.RWMutex
@@ -420,6 +421,85 @@ func (m *Manager) Connect(instanceID string) (*Instance, error) {
 	}
 
 	return inst, nil
+}
+
+// ConnectWithPairingCode connects an instance using phone pairing code
+func (m *Manager) ConnectWithPairingCode(instanceID, phoneNumber string) (string, error) {
+	inst, err := m.GetOrCreateInstance(instanceID)
+	if err != nil {
+		return "", err
+	}
+
+	inst.mu.Lock()
+	currentStatus := inst.Status
+	inst.mu.Unlock()
+
+	if currentStatus == "connected" {
+		return "", fmt.Errorf("already connected")
+	}
+
+	// Clean phone number
+	phoneNumber = strings.TrimPrefix(phoneNumber, "+")
+
+	inst.mu.Lock()
+	inst.Status = "pairing"
+	inst.mu.Unlock()
+
+	// Connect first (required before PairPhone)
+	if !inst.Client.IsConnected() {
+		err = inst.Client.Connect()
+		if err != nil {
+			inst.mu.Lock()
+			inst.Status = "disconnected"
+			inst.mu.Unlock()
+			return "", fmt.Errorf("failed to connect: %w", err)
+		}
+	}
+
+	// Request pairing code
+	code, err := inst.Client.PairPhone(context.Background(), phoneNumber, true, whatsmeow.PairClientChrome, "Chrome (Mac OS)")
+	if err != nil {
+		inst.mu.Lock()
+		inst.Status = "disconnected"
+		inst.mu.Unlock()
+		return "", fmt.Errorf("failed to get pairing code: %w", err)
+	}
+
+	// Format code as XXXX-XXXX
+	formattedCode := code
+	if len(code) == 8 {
+		formattedCode = code[:4] + "-" + code[4:]
+	}
+
+	inst.mu.Lock()
+	inst.PairingCode = formattedCode
+	inst.mu.Unlock()
+
+	log.Info().Str("instanceId", instanceID).Str("code", formattedCode).Msg("Pairing code generated")
+
+	// Publish event
+	m.publishEvent(Event{
+		Type:       "pairing_code",
+		InstanceID: instanceID,
+		Data: map[string]string{
+			"code": formattedCode,
+		},
+	})
+
+	return formattedCode, nil
+}
+
+// GetPairingCode gets pairing code for instance
+func (m *Manager) GetPairingCode(instanceID string) string {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return ""
+	}
+
+	inst.mu.RLock()
+	defer inst.mu.RUnlock()
+
+	return inst.PairingCode
 }
 
 // Disconnect disconnects an instance

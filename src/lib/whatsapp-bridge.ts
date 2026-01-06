@@ -225,6 +225,34 @@ class WhatsAppBridge extends EventEmitter {
     }
 
     /**
+     * Connect instance using pairing code (alternative to QR)
+     */
+    async connectWithPairingCode(instanceId: string, phoneNumber: string): Promise<{ pairingCode: string }> {
+        logger.info({ instanceId, phoneNumber }, 'Connecting instance with pairing code');
+
+        const data = await this.request<Record<string, unknown>>(`/instance/${instanceId}/connect-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber }),
+        });
+
+        const pairingCode = data.pairingCode as string;
+
+        // Update instance status
+        const instance = this.instances.get(instanceId) || {
+            id: instanceId,
+            status: 'connecting' as const,
+        };
+        instance.status = 'connecting';
+        this.instances.set(instanceId, instance);
+
+        // Connect WebSocket for events
+        this.connectWebSocket(instanceId);
+
+        return { pairingCode };
+    }
+
+    /**
      * Disconnect instance
      */
     async disconnect(instanceId: string): Promise<void> {

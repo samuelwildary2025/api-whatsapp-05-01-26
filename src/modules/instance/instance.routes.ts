@@ -77,6 +77,51 @@ instance.post('/:id/connect', authMiddleware, async (c) => {
 });
 
 /**
+ * POST /instance/:id/connect-code
+ * Connect instance using pairing code (alternative to QR)
+ */
+instance.post('/:id/connect-code', authMiddleware, async (c) => {
+    const { id } = c.req.param();
+    const user = c.get('user');
+
+    // Check instance exists and belongs to user
+    const instanceData = await prisma.instance.findFirst({
+        where: {
+            id,
+            OR: [{ userId: user.userId }, { user: { role: 'ADMIN' } }],
+        },
+    });
+
+    if (!instanceData) {
+        throw new HTTPException(404, { message: 'Instance not found' });
+    }
+
+    try {
+        const body = await c.req.json();
+        const phoneNumber = body.phoneNumber;
+
+        if (!phoneNumber) {
+            throw new HTTPException(400, { message: 'phoneNumber is required' });
+        }
+
+        const result = await waManager.connectWithPairingCode(id, phoneNumber);
+
+        return c.json({
+            success: true,
+            data: {
+                status: 'pairing',
+                pairingCode: result.pairingCode,
+                message: 'Enter this code in WhatsApp > Settings > Linked Devices > Link a Device',
+            },
+        });
+    } catch (error) {
+        throw new HTTPException(500, {
+            message: error instanceof Error ? error.message : 'Failed to get pairing code'
+        });
+    }
+});
+
+/**
  * POST /instance/:id/disconnect
  * Disconnect instance (keeps session for reconnection)
  */

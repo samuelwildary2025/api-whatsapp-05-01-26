@@ -149,6 +149,13 @@ class ApiClient {
         });
     }
 
+    async connectWithPairingCode(id: string, phoneNumber: string) {
+        return this.request(`/instance/${id}/connect-code`, {
+            method: 'POST',
+            body: JSON.stringify({ phoneNumber }),
+        });
+    }
+
     async disconnectInstance(id: string) {
         return this.request(`/instance/${id}/disconnect`, {
             method: 'POST',

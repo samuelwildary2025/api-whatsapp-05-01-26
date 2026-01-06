@@ -58,6 +58,7 @@ func main() {
 
 	// Instance routes
 	router.HandleFunc("/instance/{id}/connect", handlers.ConnectInstance).Methods("POST")
+	router.HandleFunc("/instance/{id}/connect-code", handlers.ConnectWithCode).Methods("POST")
 	router.HandleFunc("/instance/{id}/disconnect", handlers.DisconnectInstance).Methods("POST")
 	router.HandleFunc("/instance/{id}/logout", handlers.LogoutInstance).Methods("POST")
 	router.HandleFunc("/instance/{id}/status", handlers.GetInstanceStatus).Methods("GET")
