@@ -50,6 +50,7 @@ export interface IWhatsAppManager extends EventEmitter {
     // Instance Management
     createInstance(instanceId: string): Promise<any>;
     connect(instanceId: string): Promise<any>;
+    connectWithPairingCode(instanceId: string, phoneNumber: string): Promise<{ pairingCode: string }>;
     disconnect(instanceId: string): Promise<void>;
     logout(instanceId: string): Promise<void>;
     deleteInstance(instanceId: string): Promise<void>;
