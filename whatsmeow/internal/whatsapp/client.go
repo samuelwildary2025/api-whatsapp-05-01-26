@@ -62,6 +62,10 @@ type Manager struct {
 
 	mapping     map[string]string // InstanceID -> JIDString
 	mappingFile string
+
+	// Message storage for each chat
+	messages   map[string]map[string][]MessageData // instanceID -> chatID -> messages
+	messagesMu sync.RWMutex
 }
 
 // Event represents a WhatsApp event
@@ -103,6 +107,7 @@ func NewManager(dataDir string) (*Manager, error) {
 		eventSubs:   make(map[string][]chan Event),
 		mapping:     make(map[string]string),
 		mappingFile: fmt.Sprintf("%s/instances.json", dataDir),
+		messages:    make(map[string]map[string][]MessageData),
 	}
 
 	// Load mapping
@@ -338,10 +343,46 @@ func (m *Manager) setupEventHandlers(inst *Instance) {
 		case *events.Message:
 			msgData := m.formatMessage(inst.ID, v)
 			log.Debug().Str("instanceId", inst.ID).Str("from", msgData.From).Msg("Message received")
+
+			// Store the message
+			m.storeMessage(inst.ID, msgData.To, msgData)
+
 			m.publishEvent(Event{
 				Type:       "message",
 				InstanceID: inst.ID,
 				Data:       msgData,
+			})
+
+		case *events.HistorySync:
+			// Process history sync to capture historical messages
+			log.Info().Str("instanceId", inst.ID).Int("conversations", len(v.Data.GetConversations())).Msg("Received history sync")
+
+			for _, conv := range v.Data.GetConversations() {
+				chatJID := conv.GetID()
+				for _, historyMsg := range conv.GetMessages() {
+					webMsg := historyMsg.GetMessage()
+					if webMsg == nil {
+						continue
+					}
+
+					// Parse the web message to get message data
+					parsedMsg, err := inst.Client.ParseWebMessage(types.JID{}, webMsg)
+					if err != nil {
+						log.Warn().Err(err).Msg("Failed to parse history message")
+						continue
+					}
+
+					msgData := m.formatMessage(inst.ID, parsedMsg)
+					m.storeMessage(inst.ID, chatJID, msgData)
+				}
+			}
+
+			m.publishEvent(Event{
+				Type:       "history_sync",
+				InstanceID: inst.ID,
+				Data: map[string]interface{}{
+					"conversations": len(v.Data.GetConversations()),
+				},
 			})
 
 		case *events.Receipt:
@@ -1419,4 +1460,60 @@ func (m *Manager) CheckNumber(instanceID, number string) (*CheckNumberResult, er
 		IsOnWhatsApp: result[0].IsIn,
 		JID:          result[0].JID.String(),
 	}, nil
+}
+
+// storeMessage stores a message in memory for later retrieval
+func (m *Manager) storeMessage(instanceID, chatID string, msg MessageData) {
+	m.messagesMu.Lock()
+	defer m.messagesMu.Unlock()
+
+	if m.messages[instanceID] == nil {
+		m.messages[instanceID] = make(map[string][]MessageData)
+	}
+
+	// Limit to last 500 messages per chat to avoid memory issues
+	msgs := m.messages[instanceID][chatID]
+	msgs = append(msgs, msg)
+	if len(msgs) > 500 {
+		msgs = msgs[len(msgs)-500:]
+	}
+	m.messages[instanceID][chatID] = msgs
+}
+
+// GetChatMessages returns stored messages for a specific chat
+func (m *Manager) GetChatMessages(instanceID, chatID string, limit int) ([]MessageData, error) {
+	m.messagesMu.RLock()
+	defer m.messagesMu.RUnlock()
+
+	if m.messages[instanceID] == nil {
+		return []MessageData{}, nil
+	}
+
+	msgs := m.messages[instanceID][chatID]
+	if msgs == nil {
+		return []MessageData{}, nil
+	}
+
+	// Return last N messages
+	if limit > 0 && len(msgs) > limit {
+		msgs = msgs[len(msgs)-limit:]
+	}
+
+	return msgs, nil
+}
+
+// GetAllStoredChats returns list of chats that have stored messages
+func (m *Manager) GetAllStoredChats(instanceID string) []string {
+	m.messagesMu.RLock()
+	defer m.messagesMu.RUnlock()
+
+	if m.messages[instanceID] == nil {
+		return []string{}
+	}
+
+	chats := make([]string, 0, len(m.messages[instanceID]))
+	for chatID := range m.messages[instanceID] {
+		chats = append(chats, chatID)
+	}
+	return chats
 }

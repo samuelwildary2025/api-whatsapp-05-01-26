@@ -583,7 +583,16 @@ class WhatsAppBridge extends EventEmitter {
     async setGroupDescription(_i: string, _g: string, _d: string) { throw new Error('Not implemented'); }
     async revokeInviteCode(_i: string, _g: string): Promise<string> { throw new Error('Not implemented'); }
     async joinGroupByInviteCode(_i: string, _c: string) { throw new Error('Not implemented'); }
-    async getChatMessages(_i: string, _c: string, _o?: object) { return []; }
+    async getChatMessages(instanceId: string, chatId: string, limit: number = 50) {
+        const resp = await fetch(`${this.baseUrl}/chats/${instanceId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId, limit }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to get messages');
+        return data.data || [];
+    }
 
 }
 

@@ -458,6 +458,33 @@ func (h *Handlers) GetGroups(w http.ResponseWriter, r *http.Request) {
 	successResponse(w, groups)
 }
 
+// GetChatMessages gets messages from a specific chat
+func (h *Handlers) GetChatMessages(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceID := vars["instanceId"]
+
+	var req struct {
+		ChatID string `json:"chatId"`
+		Limit  int    `json:"limit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Limit <= 0 {
+		req.Limit = 50
+	}
+
+	messages, err := h.manager.GetChatMessages(instanceID, req.ChatID, req.Limit)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, messages)
+}
+
 // ============================================
 // Poll, Edit, React, Delete Handlers
 // ============================================

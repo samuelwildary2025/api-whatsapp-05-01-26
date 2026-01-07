@@ -91,6 +91,7 @@ func main() {
 
 	// Chat routes
 	router.HandleFunc("/chats/{instanceId}", handlers.GetChats).Methods("GET")
+	router.HandleFunc("/chats/{instanceId}/messages", handlers.GetChatMessages).Methods("POST")
 
 	// Group routes
 	router.HandleFunc("/groups/{instanceId}", handlers.GetGroups).Methods("GET")
