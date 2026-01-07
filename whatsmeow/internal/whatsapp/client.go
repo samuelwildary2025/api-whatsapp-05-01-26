@@ -779,6 +779,11 @@ func (m *Manager) SendTextMessage(instanceID, to, text string) (string, error) {
 		return "", fmt.Errorf("whatsmeow send error: %w", err)
 	}
 
+	// Clear presence (stop typing) immediately after sending
+	go func() {
+		inst.Client.SendChatPresence(context.Background(), jid, types.ChatPresencePaused, types.ChatPresenceMediaText)
+	}()
+
 	log.Info().Str("instanceId", instanceID).Str("msgId", resp.ID).Msg("Message sent successfully")
 	return resp.ID, nil
 }
@@ -1008,6 +1013,11 @@ func (m *Manager) SendMediaMessage(instanceID, to, mediaUrl, caption, mediaType 
 	if err != nil {
 		return "", fmt.Errorf("failed to send media message: %w", err)
 	}
+
+	// Clear presence (stop typing/recording) immediately after sending
+	go func() {
+		inst.Client.SendChatPresence(context.Background(), jid, types.ChatPresencePaused, types.ChatPresenceMediaText)
+	}()
 
 	return sentResp.ID, nil
 }
