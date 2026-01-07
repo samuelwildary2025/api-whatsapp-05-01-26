@@ -85,6 +85,7 @@ func main() {
 	router.HandleFunc("/message/poll", handlers.SendPollMessage).Methods("POST")
 	router.HandleFunc("/message/edit", handlers.EditMessage).Methods("POST")
 	router.HandleFunc("/message/react", handlers.ReactToMessage).Methods("POST")
+	router.HandleFunc("/message/read", handlers.MarkChatAsRead).Methods("POST")
 	router.HandleFunc("/message/delete", handlers.DeleteMessage).Methods("POST")
 
 	// Contact routes

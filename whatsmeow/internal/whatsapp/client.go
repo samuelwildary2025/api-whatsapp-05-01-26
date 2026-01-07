@@ -632,6 +632,29 @@ func (m *Manager) GetPairingCode(instanceID string) string {
 	return inst.PairingCode
 }
 
+// MarkChatAsRead marks a chat as read
+func (m *Manager) MarkChatAsRead(instanceID, chatID string) error {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return fmt.Errorf("instance not found")
+	}
+	inst.mu.RLock()
+	client := inst.Client
+	inst.mu.RUnlock()
+
+	if client == nil {
+		return fmt.Errorf("client not initialized")
+	}
+
+	chatJID, err := types.ParseJID(chatID)
+	if err != nil {
+		return err
+	}
+
+	// Mark as read
+	return client.MarkRead(context.Background(), []types.MessageID{}, time.Now(), chatJID, types.EmptyJID)
+}
+
 // Disconnect disconnects an instance
 func (m *Manager) Disconnect(instanceID string) error {
 	m.mu.RLock()

@@ -585,6 +585,18 @@ class WhatsAppBridge extends EventEmitter {
         });
     }
 
+    async markChatAsRead(instanceId: string, chatId: string) {
+        const cleanedChatId = chatId.replace(/\D/g, '');
+
+        await this.request<void>('/message/read', {
+            method: 'POST',
+            body: JSON.stringify({
+                instanceId,
+                chatId: cleanedChatId,
+            }),
+        });
+    }
+
     async downloadMedia(_i: string, _m: string, _o?: object) { throw new Error('Not implemented'); }
     async getContacts(_i: string) { return []; }
     async getContactById(_i: string, _c: string) { throw new Error('Not implemented'); }

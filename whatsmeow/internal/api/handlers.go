@@ -681,6 +681,44 @@ func (h *Handlers) ReactToMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MarkChatAsReadRequest represents mark chat as read request
+type MarkChatAsReadRequest struct {
+	InstanceID string `json:"instanceId"`
+	ChatID     string `json:"chatId"`
+}
+
+// MarkChatAsRead marks a chat as read
+func (h *Handlers) MarkChatAsRead(w http.ResponseWriter, r *http.Request) {
+	var req MarkChatAsReadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.InstanceID == "" || req.ChatID == "" {
+		errorResponse(w, http.StatusBadRequest, "instanceId and chatId are required")
+		return
+	}
+
+	chatID := cleanPhoneNumber(req.ChatID)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("chatId", chatID).
+		Msg("Marking chat as read")
+
+	err := h.manager.MarkChatAsRead(req.InstanceID, chatID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to mark chat as read")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]string{
+		"status": "success",
+	})
+}
+
 // DeleteMessageRequest represents delete message request
 type DeleteMessageRequest struct {
 	InstanceID  string `json:"instanceId"`
