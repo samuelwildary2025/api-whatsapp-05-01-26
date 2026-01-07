@@ -11,6 +11,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	waProto "go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
+	"google.golang.org/protobuf/proto"
 
 	"whatsmeow-service/internal/api"
 	"whatsmeow-service/internal/whatsapp"
@@ -37,6 +40,14 @@ func main() {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		log.Fatal().Err(err).Msg("Failed to create data directory")
 	}
+
+	// Configure device identity as Chrome browser on macOS
+	// This makes WhatsApp show "Chrome" instead of "Outros" in connected devices
+	store.DeviceProps.Os = proto.String("Mac OS")
+	store.DeviceProps.PlatformType = waProto.DeviceProps_CHROME.Enum()
+	store.DeviceProps.RequireFullSync = proto.Bool(false)
+
+	log.Info().Msg("Configured device identity as Chrome on Mac OS")
 
 	// Initialize WhatsApp manager
 	manager, err := whatsapp.NewManager(dataDir)
