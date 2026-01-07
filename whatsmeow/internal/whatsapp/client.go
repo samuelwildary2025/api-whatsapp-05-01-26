@@ -38,7 +38,15 @@ type Instance struct {
 	PairingCode  string
 	WANumber     string
 	WAName       string
-	mu           sync.RWMutex
+
+	// Settings
+	RejectCalls  bool // Auto-reject incoming calls
+	AlwaysOnline bool // Keep presence as online 24h
+	IgnoreGroups bool // Don't process group messages
+	SyncHistory  bool // Request full history sync on connect
+	ReadMessages bool // Auto mark messages as read
+
+	mu sync.RWMutex
 }
 
 // RLock locks instance for reading
@@ -341,11 +349,31 @@ func (m *Manager) setupEventHandlers(inst *Instance) {
 			})
 
 		case *events.Message:
+			// Check if we should ignore group messages
+			inst.mu.RLock()
+			ignoreGroups := inst.IgnoreGroups
+			readMessages := inst.ReadMessages
+			inst.mu.RUnlock()
+
+			if ignoreGroups && v.Info.IsGroup {
+				log.Debug().Str("instanceId", inst.ID).Msg("Ignoring group message (setting enabled)")
+				return
+			}
+
 			msgData := m.formatMessage(inst.ID, v)
 			log.Debug().Str("instanceId", inst.ID).Str("from", msgData.From).Msg("Message received")
-
 			// Store the message
 			m.storeMessage(inst.ID, msgData.To, msgData)
+
+			// Auto mark as read if enabled
+			if readMessages && !v.Info.IsFromMe {
+				go func() {
+					err := inst.Client.MarkRead(context.Background(), []types.MessageID{v.Info.ID}, time.Now(), v.Info.Chat, v.Info.Sender)
+					if err != nil {
+						log.Warn().Err(err).Msg("Failed to mark message as read")
+					}
+				}()
+			}
 
 			m.publishEvent(Event{
 				Type:       "message",
@@ -395,6 +423,35 @@ func (m *Manager) setupEventHandlers(inst *Instance) {
 					"from":       v.MessageSource.Sender.String(),
 				},
 			})
+
+		case *events.CallOffer:
+			log.Info().Str("instanceId", inst.ID).Str("from", v.CallCreator.String()).Str("callId", v.CallID).Msg("Incoming call")
+
+			// Publish call event
+			m.publishEvent(Event{
+				Type:       "call",
+				InstanceID: inst.ID,
+				Data: map[string]interface{}{
+					"from":   v.CallCreator.String(),
+					"callId": v.CallID,
+					"type":   "offer",
+				},
+			})
+
+			// Auto-reject if enabled
+			inst.mu.RLock()
+			shouldReject := inst.RejectCalls
+			inst.mu.RUnlock()
+
+			if shouldReject {
+				log.Info().Str("instanceId", inst.ID).Str("callId", v.CallID).Msg("Auto-rejecting call")
+				err := inst.Client.RejectCall(context.Background(), v.CallCreator, v.CallID)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to reject call")
+				} else {
+					log.Info().Str("callId", v.CallID).Msg("Call rejected successfully")
+				}
+			}
 		}
 	})
 }
@@ -1516,4 +1573,73 @@ func (m *Manager) GetAllStoredChats(instanceID string) []string {
 		chats = append(chats, chatID)
 	}
 	return chats
+}
+
+// SetRejectCalls sets the reject calls setting for an instance
+func (m *Manager) SetRejectCalls(instanceID string, value bool) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return
+	}
+	inst.mu.Lock()
+	inst.RejectCalls = value
+	inst.mu.Unlock()
+	log.Info().Str("instanceId", instanceID).Bool("rejectCalls", value).Msg("Updated reject calls setting")
+}
+
+// SetAlwaysOnline sets the always online setting for an instance
+func (m *Manager) SetAlwaysOnline(instanceID string, value bool) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return
+	}
+	inst.mu.Lock()
+	inst.AlwaysOnline = value
+	inst.mu.Unlock()
+	log.Info().Str("instanceId", instanceID).Bool("alwaysOnline", value).Msg("Updated always online setting")
+
+	// If enabled and connected, send presence
+	if value && inst.Client != nil && inst.Status == "connected" {
+		inst.Client.SendPresence(context.Background(), types.PresenceAvailable)
+	}
+}
+
+// SetIgnoreGroups sets the ignore groups setting for an instance
+func (m *Manager) SetIgnoreGroups(instanceID string, value bool) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return
+	}
+	inst.mu.Lock()
+	inst.IgnoreGroups = value
+	inst.mu.Unlock()
+	log.Info().Str("instanceId", instanceID).Bool("ignoreGroups", value).Msg("Updated ignore groups setting")
+}
+
+// SetReadMessages sets the auto read messages setting for an instance
+func (m *Manager) SetReadMessages(instanceID string, value bool) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return
+	}
+	inst.mu.Lock()
+	inst.ReadMessages = value
+	inst.mu.Unlock()
+	log.Info().Str("instanceId", instanceID).Bool("readMessages", value).Msg("Updated read messages setting")
+}
+
+// GetSettings returns the current settings for an instance
+func (m *Manager) GetSettings(instanceID string) map[string]bool {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return map[string]bool{}
+	}
+	inst.mu.RLock()
+	defer inst.mu.RUnlock()
+	return map[string]bool{
+		"rejectCalls":  inst.RejectCalls,
+		"alwaysOnline": inst.AlwaysOnline,
+		"ignoreGroups": inst.IgnoreGroups,
+		"readMessages": inst.ReadMessages,
+	}
 }

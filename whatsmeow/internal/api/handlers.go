@@ -186,6 +186,38 @@ func (h *Handlers) GetInstanceStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// SetSettings updates instance settings
+func (h *Handlers) SetSettings(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceID := vars["id"]
+
+	var req struct {
+		RejectCalls  *bool `json:"rejectCalls,omitempty"`
+		AlwaysOnline *bool `json:"alwaysOnline,omitempty"`
+		IgnoreGroups *bool `json:"ignoreGroups,omitempty"`
+		ReadMessages *bool `json:"readMessages,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.RejectCalls != nil {
+		h.manager.SetRejectCalls(instanceID, *req.RejectCalls)
+	}
+	if req.AlwaysOnline != nil {
+		h.manager.SetAlwaysOnline(instanceID, *req.AlwaysOnline)
+	}
+	if req.IgnoreGroups != nil {
+		h.manager.SetIgnoreGroups(instanceID, *req.IgnoreGroups)
+	}
+	if req.ReadMessages != nil {
+		h.manager.SetReadMessages(instanceID, *req.ReadMessages)
+	}
+
+	successResponse(w, h.manager.GetSettings(instanceID))
+}
+
 // GetQRCode gets QR code for instance
 func (h *Handlers) GetQRCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

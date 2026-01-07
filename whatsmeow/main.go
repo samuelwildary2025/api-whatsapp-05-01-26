@@ -73,6 +73,7 @@ func main() {
 	router.HandleFunc("/instance/{id}/disconnect", handlers.DisconnectInstance).Methods("POST")
 	router.HandleFunc("/instance/{id}/logout", handlers.LogoutInstance).Methods("POST")
 	router.HandleFunc("/instance/{id}/status", handlers.GetInstanceStatus).Methods("GET")
+	router.HandleFunc("/instance/{id}/settings", handlers.SetSettings).Methods("POST")
 	router.HandleFunc("/instance/{id}/qr", handlers.GetQRCode).Methods("GET")
 
 	// Message routes
