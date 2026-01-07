@@ -556,7 +556,7 @@ class WhatsAppBridge extends EventEmitter {
     async getBlockedContacts(_i: string) { return []; }
     async getChats(instanceId: string) {
         const resp = await fetch(`${this.baseUrl}/chats/${instanceId}`);
-        const data = await resp.json();
+        const data = await resp.json() as { error?: string; data?: unknown[] };
         if (!resp.ok) throw new Error(data.error || 'Failed to get chats');
         return data.data || [];
     }
@@ -589,7 +589,7 @@ class WhatsAppBridge extends EventEmitter {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chatId, limit }),
         });
-        const data = await resp.json();
+        const data = await resp.json() as { error?: string; data?: unknown[] };
         if (!resp.ok) throw new Error(data.error || 'Failed to get messages');
         return data.data || [];
     }
