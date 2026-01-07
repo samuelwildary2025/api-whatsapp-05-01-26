@@ -1045,6 +1045,12 @@ func (m *Manager) EditMessage(instanceID, chatID, messageID, newText string) (st
 		return "", fmt.Errorf("invalid chat JID: %w", err)
 	}
 
+	// Resolve user devices first to ensure LID is available
+	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	if err != nil {
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
+	}
+
 	// Build edit message
 	editMsg := inst.Client.BuildEdit(chatJID, messageID, &waE2E.Message{
 		Conversation: proto.String(newText),
@@ -1093,6 +1099,12 @@ func (m *Manager) ReactToMessage(instanceID, chatID, messageID, reaction string)
 		return fmt.Errorf("invalid chat JID: %w", err)
 	}
 
+	// Resolve user devices first to ensure LID is available
+	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	if err != nil {
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
+	}
+
 	log.Info().
 		Str("instanceId", instanceID).
 		Str("chatId", chatID).
@@ -1136,6 +1148,12 @@ func (m *Manager) DeleteMessage(instanceID, chatID, messageID string, forEveryon
 	chatJID, err := types.ParseJID(chatID)
 	if err != nil {
 		return fmt.Errorf("invalid chat JID: %w", err)
+	}
+
+	// Resolve user devices first to ensure LID is available
+	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	if err != nil {
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
 	}
 
 	log.Info().
