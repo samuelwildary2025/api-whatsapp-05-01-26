@@ -1665,17 +1665,34 @@ func (m *Manager) SetProxy(instanceID string, host, port, username, password, pr
 	inst.ProxyPassword = password
 	inst.ProxyProtocol = protocol
 	client := inst.Client
+	status := inst.Status
 	inst.mu.Unlock()
 
 	// Build proxy URL
 	proxyURL := m.buildProxyURL(host, port, username, password, protocol)
 
-	if proxyURL != "" && client != nil {
+	if client != nil {
 		client.SetProxyAddress(proxyURL)
-		log.Info().Str("instanceId", instanceID).Str("proxy", host+":"+port).Msg("Proxy configured")
-	} else if proxyURL == "" && client != nil {
-		client.SetProxyAddress("")
-		log.Info().Str("instanceId", instanceID).Msg("Proxy disabled")
+		if proxyURL != "" {
+			log.Info().Str("instanceId", instanceID).Str("proxy", host+":"+port).Msg("Proxy configured")
+		} else {
+			log.Info().Str("instanceId", instanceID).Msg("Proxy disabled")
+		}
+
+		// If connected, reconnect to apply the new proxy
+		if status == "connected" {
+			log.Info().Str("instanceId", instanceID).Msg("Reconnecting to apply proxy...")
+			go func() {
+				// Disconnect and reconnect
+				client.Disconnect()
+				time.Sleep(1 * time.Second)
+				if err := client.Connect(); err != nil {
+					log.Error().Err(err).Str("instanceId", instanceID).Msg("Failed to reconnect after proxy change")
+				} else {
+					log.Info().Str("instanceId", instanceID).Msg("Reconnected with new proxy settings")
+				}
+			}()
+		}
 	}
 
 	return nil
