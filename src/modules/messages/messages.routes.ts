@@ -7,18 +7,18 @@ import { HTTPException } from 'hono/http-exception';
 const messages = new Hono();
 
 // Add CORS headers for browser fetch requests
-    messages.use('*', async (c, next) => {
-        // Handle preflight requests
-        if (c.req.method === 'OPTIONS') {
-            c.header('Access-Control-Allow-Origin', '*');
-            c.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-            c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Instance-Token');
-            return c.text('', 204 as any);
-        }
-        await next();
+messages.use('*', async (c, next) => {
+    // Handle preflight requests
+    if (c.req.method === 'OPTIONS') {
         c.header('Access-Control-Allow-Origin', '*');
-        return;
-    });
+        c.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Instance-Token');
+        return c.text('', 204 as any);
+    }
+    await next();
+    c.header('Access-Control-Allow-Origin', '*');
+    return;
+});
 
 // All message routes use instance token authentication
 messages.use('*', instanceTokenMiddleware);
@@ -69,16 +69,19 @@ const pollSchema = z.object({
 });
 
 const reactionSchema = z.object({
+    chatId: z.string().min(1),
     messageId: z.string().min(1),
     reaction: z.string().min(1),
 });
 
 const deleteMessageSchema = z.object({
+    chatId: z.string().min(1),
     messageId: z.string().min(1),
     forEveryone: z.boolean().default(true),
 });
 
 const editMessageSchema = z.object({
+    chatId: z.string().min(1),
     messageId: z.string().min(1),
     newText: z.string().min(1),
 });
@@ -122,7 +125,7 @@ messages.post('/text', async (c) => {
         // Enhanced error logging
         const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
         console.error(`[Message Send Error] Instance: ${instanceId}, To: ${data.to}, Error: ${errorMessage}`);
-        
+
         throw new HTTPException(500, {
             message: errorMessage,
         });
@@ -286,7 +289,7 @@ messages.post('/edit', async (c) => {
     const data = editMessageSchema.parse(body);
 
     try {
-        const result = await waManager.editMessage(instanceId, data.messageId, data.newText);
+        const result = await waManager.editMessage(instanceId, data.chatId, data.messageId, data.newText);
 
         return c.json({
             success: true,
@@ -310,8 +313,8 @@ messages.post('/download', async (c) => {
 
     try {
         const result = await waManager.downloadMedia(
-            instanceId, 
-            data.id, 
+            instanceId,
+            data.id,
             {
                 returnBase64: data.return_base64,
                 generateMp3: data.generate_mp3,
@@ -347,7 +350,7 @@ messages.post('/react', async (c) => {
     const data = reactionSchema.parse(body);
 
     try {
-        await waManager.reactToMessage(instanceId, data.messageId, data.reaction);
+        await waManager.reactToMessage(instanceId, data.chatId, data.messageId, data.reaction);
 
         return c.json({
             success: true,
@@ -370,7 +373,7 @@ messages.post('/delete', async (c) => {
     const data = deleteMessageSchema.parse(body);
 
     try {
-        await waManager.deleteMessage(instanceId, data.messageId, data.forEveryone);
+        await waManager.deleteMessage(instanceId, data.chatId, data.messageId, data.forEveryone);
 
         return c.json({
             success: true,

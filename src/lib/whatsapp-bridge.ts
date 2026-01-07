@@ -501,14 +501,14 @@ class WhatsAppBridge extends EventEmitter {
         };
     }
 
-    async editMessage(instanceId: string, messageId: string, newText: string) {
-        // Note: editMessage needs chatId - we'll extract from messageId if possible
-        // For now, we expect the frontend to pass the chatId separately or it's encoded in messageId
+    async editMessage(instanceId: string, chatId: string, messageId: string, newText: string) {
+        const cleanedChatId = chatId.replace(/\D/g, '');
+
         const data = await this.request<Record<string, unknown>>('/message/edit', {
             method: 'POST',
             body: JSON.stringify({
                 instanceId,
-                chatId: messageId.split('_')[0] || '', // Extract chatId from messageId format
+                chatId: cleanedChatId,
                 messageId,
                 newText,
             }),
@@ -519,25 +519,28 @@ class WhatsAppBridge extends EventEmitter {
         };
     }
 
-    async reactToMessage(instanceId: string, messageId: string, reaction: string) {
-        // Similar to edit - need chatId
+    async reactToMessage(instanceId: string, chatId: string, messageId: string, reaction: string) {
+        const cleanedChatId = chatId.replace(/\D/g, '');
+
         await this.request<void>('/message/react', {
             method: 'POST',
             body: JSON.stringify({
                 instanceId,
-                chatId: messageId.split('_')[0] || '',
+                chatId: cleanedChatId,
                 messageId,
                 reaction,
             }),
         });
     }
 
-    async deleteMessage(instanceId: string, messageId: string, forEveryone?: boolean) {
+    async deleteMessage(instanceId: string, chatId: string, messageId: string, forEveryone?: boolean) {
+        const cleanedChatId = chatId.replace(/\D/g, '');
+
         await this.request<void>('/message/delete', {
             method: 'POST',
             body: JSON.stringify({
                 instanceId,
-                chatId: messageId.split('_')[0] || '',
+                chatId: cleanedChatId,
                 messageId,
                 forEveryone: forEveryone ?? true,
             }),
