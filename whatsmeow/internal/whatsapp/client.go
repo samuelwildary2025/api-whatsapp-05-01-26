@@ -1045,10 +1045,12 @@ func (m *Manager) EditMessage(instanceID, chatID, messageID, newText string) (st
 		return "", fmt.Errorf("invalid chat JID: %w", err)
 	}
 
-	// Resolve user devices first to ensure LID is available
-	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	// Use IsOnWhatsApp to resolve LID - this queries the server and populates PN→LID mapping
+	isOnWA, err := inst.Client.IsOnWhatsApp(context.Background(), []string{strings.TrimSuffix(chatID, "@s.whatsapp.net")})
 	if err != nil {
-		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to check IsOnWhatsApp, trying to send anyway")
+	} else if len(isOnWA) > 0 && isOnWA[0].IsIn {
+		log.Info().Str("jid", isOnWA[0].JID.String()).Msg("Resolved WhatsApp JID for edit")
 	}
 
 	// Build edit message
@@ -1099,10 +1101,12 @@ func (m *Manager) ReactToMessage(instanceID, chatID, messageID, reaction string)
 		return fmt.Errorf("invalid chat JID: %w", err)
 	}
 
-	// Resolve user devices first to ensure LID is available
-	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	// Use IsOnWhatsApp to resolve LID - this queries the server and populates PN→LID mapping
+	isOnWA, err := inst.Client.IsOnWhatsApp(context.Background(), []string{strings.TrimSuffix(chatID, "@s.whatsapp.net")})
 	if err != nil {
-		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to check IsOnWhatsApp, trying to send anyway")
+	} else if len(isOnWA) > 0 && isOnWA[0].IsIn {
+		log.Info().Str("jid", isOnWA[0].JID.String()).Msg("Resolved WhatsApp JID for reaction")
 	}
 
 	log.Info().
@@ -1150,10 +1154,12 @@ func (m *Manager) DeleteMessage(instanceID, chatID, messageID string, forEveryon
 		return fmt.Errorf("invalid chat JID: %w", err)
 	}
 
-	// Resolve user devices first to ensure LID is available
-	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{chatJID})
+	// Use IsOnWhatsApp to resolve LID - this queries the server and populates PN→LID mapping
+	isOnWA, err := inst.Client.IsOnWhatsApp(context.Background(), []string{strings.TrimSuffix(chatID, "@s.whatsapp.net")})
 	if err != nil {
-		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to get user devices, trying to send anyway")
+		log.Warn().Err(err).Str("chatId", chatID).Msg("Failed to check IsOnWhatsApp, trying to send anyway")
+	} else if len(isOnWA) > 0 && isOnWA[0].IsIn {
+		log.Info().Str("jid", isOnWA[0].JID.String()).Msg("Resolved WhatsApp JID for delete")
 	}
 
 	log.Info().
