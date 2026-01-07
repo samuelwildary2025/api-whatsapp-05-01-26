@@ -90,7 +90,8 @@ export default function ExportPage() {
 
             console.log('Loading chats for instance:', instance.id, 'token:', instance.token);
 
-            const response = await fetch(`/chats/search`, {
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+            const response = await fetch(`${API_BASE_URL}/chats/search`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

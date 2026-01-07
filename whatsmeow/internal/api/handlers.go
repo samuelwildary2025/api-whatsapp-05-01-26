@@ -396,20 +396,66 @@ func (h *Handlers) SendLocationMessage(w http.ResponseWriter, r *http.Request) {
 
 // GetContacts gets contacts for instance
 func (h *Handlers) GetContacts(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement
-	errorResponse(w, http.StatusNotImplemented, "Not yet implemented")
+	vars := mux.Vars(r)
+	instanceID := vars["instanceId"]
+
+	contacts, err := h.manager.GetContacts(instanceID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, contacts)
 }
 
 // CheckNumber checks if number is on WhatsApp
 func (h *Handlers) CheckNumber(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement
-	errorResponse(w, http.StatusNotImplemented, "Not yet implemented")
+	vars := mux.Vars(r)
+	instanceID := vars["instanceId"]
+
+	var req struct {
+		Number string `json:"number"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	result, err := h.manager.CheckNumber(instanceID, req.Number)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, result)
+}
+
+// GetChats gets chats/conversations for instance
+func (h *Handlers) GetChats(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceID := vars["instanceId"]
+
+	chats, err := h.manager.GetChats(instanceID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, chats)
 }
 
 // GetGroups gets groups for instance
 func (h *Handlers) GetGroups(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement
-	errorResponse(w, http.StatusNotImplemented, "Not yet implemented")
+	vars := mux.Vars(r)
+	instanceID := vars["instanceId"]
+
+	groups, err := h.manager.GetGroups(instanceID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, groups)
 }
 
 // ============================================

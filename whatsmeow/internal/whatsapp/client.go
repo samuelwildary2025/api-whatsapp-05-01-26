@@ -1228,3 +1228,195 @@ func (m *Manager) publishEvent(evt Event) {
 		}
 	}
 }
+
+// ChatInfo represents a chat/conversation
+type ChatInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IsGroup  bool   `json:"isGroup"`
+	PushName string `json:"pushName,omitempty"`
+}
+
+// ContactInfo represents a contact
+type ContactInfo struct {
+	JID      string `json:"jid"`
+	Name     string `json:"name,omitempty"`
+	PushName string `json:"pushName,omitempty"`
+	Phone    string `json:"phone,omitempty"`
+}
+
+// GroupInfo represents a group
+type GroupInfo struct {
+	JID          string   `json:"jid"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description,omitempty"`
+	Participants []string `json:"participants,omitempty"`
+}
+
+// CheckNumberResult represents number check result
+type CheckNumberResult struct {
+	Number       string `json:"number"`
+	IsOnWhatsApp bool   `json:"isOnWhatsApp"`
+	JID          string `json:"jid,omitempty"`
+}
+
+// GetContacts gets all contacts for an instance
+func (m *Manager) GetContacts(instanceID string) ([]ContactInfo, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return nil, fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	client := inst.Client
+	inst.mu.RUnlock()
+
+	if status != "connected" || client == nil {
+		return nil, fmt.Errorf("instance not connected")
+	}
+
+	contacts := make([]ContactInfo, 0)
+
+	// Get contacts from the store
+	if client.Store != nil && client.Store.Contacts != nil {
+		allContacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to get contacts from store")
+		} else {
+			for jid, contact := range allContacts {
+				contacts = append(contacts, ContactInfo{
+					JID:      jid.String(),
+					Name:     contact.FullName,
+					PushName: contact.PushName,
+					Phone:    jid.User,
+				})
+			}
+		}
+	}
+
+	return contacts, nil
+}
+
+// GetChats gets all chats/conversations for an instance
+func (m *Manager) GetChats(instanceID string) ([]ChatInfo, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return nil, fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	client := inst.Client
+	inst.mu.RUnlock()
+
+	if status != "connected" || client == nil {
+		return nil, fmt.Errorf("instance not connected")
+	}
+
+	chats := make([]ChatInfo, 0)
+
+	// Get contacts from the store - these represent recent chats
+	if client.Store != nil && client.Store.Contacts != nil {
+		allContacts, err := client.Store.Contacts.GetAllContacts(context.Background())
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to get contacts from store")
+		} else {
+			for jid, contact := range allContacts {
+				isGroup := jid.Server == "g.us"
+				name := contact.FullName
+				if name == "" {
+					name = contact.PushName
+				}
+				if name == "" {
+					name = jid.User
+				}
+
+				chats = append(chats, ChatInfo{
+					ID:       jid.String(),
+					Name:     name,
+					IsGroup:  isGroup,
+					PushName: contact.PushName,
+				})
+			}
+		}
+	}
+
+	log.Info().Int("count", len(chats)).Str("instanceId", instanceID).Msg("Got chats")
+	return chats, nil
+}
+
+// GetGroups gets all groups for an instance
+func (m *Manager) GetGroups(instanceID string) ([]GroupInfo, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return nil, fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	client := inst.Client
+	inst.mu.RUnlock()
+
+	if status != "connected" || client == nil {
+		return nil, fmt.Errorf("instance not connected")
+	}
+
+	groups := make([]GroupInfo, 0)
+
+	// Get groups from joined groups
+	joinedGroups, err := client.GetJoinedGroups(context.Background())
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to get joined groups")
+	} else {
+		for _, group := range joinedGroups {
+			groups = append(groups, GroupInfo{
+				JID:         group.JID.String(),
+				Name:        group.Name,
+				Description: group.Topic,
+			})
+		}
+	}
+
+	return groups, nil
+}
+
+// CheckNumber checks if a number is on WhatsApp
+func (m *Manager) CheckNumber(instanceID, number string) (*CheckNumberResult, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return nil, fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	client := inst.Client
+	inst.mu.RUnlock()
+
+	if status != "connected" || client == nil {
+		return nil, fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number
+	number = strings.TrimPrefix(number, "+")
+	number = strings.ReplaceAll(number, " ", "")
+	number = strings.ReplaceAll(number, "-", "")
+
+	result, err := client.IsOnWhatsApp(context.Background(), []string{number})
+	if err != nil {
+		return nil, fmt.Errorf("failed to check number: %w", err)
+	}
+
+	if len(result) == 0 {
+		return &CheckNumberResult{
+			Number:       number,
+			IsOnWhatsApp: false,
+		}, nil
+	}
+
+	return &CheckNumberResult{
+		Number:       number,
+		IsOnWhatsApp: result[0].IsIn,
+		JID:          result[0].JID.String(),
+	}, nil
+}

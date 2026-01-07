@@ -554,7 +554,12 @@ class WhatsAppBridge extends EventEmitter {
     async blockContact(_i: string, _c: string) { throw new Error('Not implemented'); }
     async unblockContact(_i: string, _c: string) { throw new Error('Not implemented'); }
     async getBlockedContacts(_i: string) { return []; }
-    async getChats(_i: string) { return []; }
+    async getChats(instanceId: string) {
+        const resp = await fetch(`${this.baseUrl}/chats/${instanceId}`);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to get chats');
+        return data.data || [];
+    }
     async getChatById(_i: string, _c: string) { throw new Error('Not implemented'); }
     async archiveChat(_i: string, _c: string) { throw new Error('Not implemented'); }
     async unarchiveChat(_i: string, _c: string) { throw new Error('Not implemented'); }

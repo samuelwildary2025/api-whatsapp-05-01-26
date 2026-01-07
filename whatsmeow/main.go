@@ -89,6 +89,9 @@ func main() {
 	router.HandleFunc("/contacts/{instanceId}", handlers.GetContacts).Methods("GET")
 	router.HandleFunc("/contacts/{instanceId}/check", handlers.CheckNumber).Methods("POST")
 
+	// Chat routes
+	router.HandleFunc("/chats/{instanceId}", handlers.GetChats).Methods("GET")
+
 	// Group routes
 	router.HandleFunc("/groups/{instanceId}", handlers.GetGroups).Methods("GET")
 
