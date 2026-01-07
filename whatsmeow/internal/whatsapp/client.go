@@ -991,6 +991,13 @@ func (m *Manager) SendPollMessage(instanceID, to, question string, options []str
 		return "", fmt.Errorf("invalid JID: %w", err)
 	}
 
+	// Resolve user devices first to ensure LID is available
+	// This is required for polls to work in the new multi-device architecture
+	_, err = inst.Client.GetUserDevices(context.Background(), []types.JID{jid})
+	if err != nil {
+		log.Warn().Err(err).Str("to", to).Msg("Failed to get user devices, trying to send anyway")
+	}
+
 	// Create poll message
 	pollMsg := inst.Client.BuildPollCreation(question, options, selectableCount)
 
