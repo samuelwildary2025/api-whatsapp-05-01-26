@@ -71,9 +71,9 @@ export interface IWhatsAppManager extends EventEmitter {
     sendContact(instanceId: string, to: string, contactId: string): Promise<any>;
     sendPresence(instanceId: string, to: string, presence: string): Promise<void>;
     sendPoll(instanceId: string, to: string, title: string, options: string[], pollOptions?: any): Promise<any>;
-    editMessage(instanceId: string, messageId: string, newText: string): Promise<any>;
-    reactToMessage(instanceId: string, messageId: string, reaction: string): Promise<void>;
-    deleteMessage(instanceId: string, messageId: string, forEveryone?: boolean): Promise<void>;
+    editMessage(instanceId: string, chatId: string, messageId: string, newText: string): Promise<any>;
+    reactToMessage(instanceId: string, chatId: string, messageId: string, reaction: string): Promise<void>;
+    deleteMessage(instanceId: string, chatId: string, messageId: string, forEveryone?: boolean): Promise<void>;
     downloadMedia(instanceId: string, messageId: string, options: any): Promise<any>;
 
     // Chats
