@@ -341,8 +341,24 @@ class WhatsAppBridge extends EventEmitter {
     /**
      * Update instance settings
      */
-    updateInstanceSettings(_instanceId: string, _settings: Partial<InstanceSettings>): void {
-        // Settings are stored in Prisma, no need to pass to whatsmeow
+    async updateInstanceSettings(instanceId: string, settings: Partial<InstanceSettings>): Promise<void> {
+        try {
+            // Forward settings to whatsmeow backend
+            const resp = await fetch(`${this.baseUrl}/instance/${instanceId}/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+            });
+
+            if (!resp.ok) {
+                const data = await resp.json() as { error?: string };
+                console.error('Failed to update whatsmeow settings:', data.error);
+            } else {
+                console.log('Whatsmeow settings updated:', settings);
+            }
+        } catch (error) {
+            console.error('Error updating whatsmeow settings:', error);
+        }
     }
 
     // ================================
