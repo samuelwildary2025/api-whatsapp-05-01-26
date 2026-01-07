@@ -424,17 +424,20 @@ function InstanceDetailContent() {
                     break;
                 case 'edit':
                     endpoint = '/message/edit';
-                    body = { messageId: targetMessageId, newText: textMessage };
+                    body = { chatId: testTo, messageId: targetMessageId, newText: textMessage };
                     if (!textMessage) throw new Error('Digite o novo texto');
+                    if (!testTo) throw new Error('Digite o número do chat');
                     break;
                 case 'react':
                     endpoint = '/message/react';
-                    body = { messageId: targetMessageId, reaction: reactionEmoji };
+                    body = { chatId: testTo, messageId: targetMessageId, reaction: reactionEmoji };
                     if (!reactionEmoji) throw new Error('Escolha um emoji');
+                    if (!testTo) throw new Error('Digite o número do chat');
                     break;
                 case 'delete':
                     endpoint = '/message/delete';
-                    body = { messageId: targetMessageId };
+                    body = { chatId: testTo, messageId: targetMessageId };
+                    if (!testTo) throw new Error('Digite o número do chat');
                     break;
             }
 
@@ -612,8 +615,8 @@ function InstanceDetailContent() {
                                         <button
                                             onClick={() => { setConnectionMethod('qr'); setPairingCode(''); }}
                                             className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${connectionMethod === 'qr'
-                                                    ? 'bg-[var(--primary)] text-white'
-                                                    : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                                                ? 'bg-[var(--primary)] text-white'
+                                                : 'text-[var(--muted)] hover:text-[var(--foreground)]'
                                                 }`}
                                         >
                                             QR Code
@@ -621,8 +624,8 @@ function InstanceDetailContent() {
                                         <button
                                             onClick={() => { setConnectionMethod('code'); }}
                                             className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${connectionMethod === 'code'
-                                                    ? 'bg-[var(--primary)] text-white'
-                                                    : 'text-[var(--muted)] hover:text-[var(--foreground)]'
+                                                ? 'bg-[var(--primary)] text-white'
+                                                : 'text-[var(--muted)] hover:text-[var(--foreground)]'
                                                 }`}
                                         >
                                             Código
