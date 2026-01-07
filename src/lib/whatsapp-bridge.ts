@@ -361,6 +361,28 @@ class WhatsAppBridge extends EventEmitter {
         }
     }
 
+    /**
+     * Set proxy configuration for an instance
+     */
+    async setProxy(instanceId: string, proxy: { proxyHost: string; proxyPort: string; proxyUsername: string; proxyPassword: string; proxyProtocol: string }): Promise<void> {
+        try {
+            const resp = await fetch(`${this.baseUrl}/instance/${instanceId}/proxy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(proxy),
+            });
+
+            if (!resp.ok) {
+                const data = await resp.json() as { error?: string };
+                console.error('Failed to set whatsmeow proxy:', data.error);
+            } else {
+                console.log('Whatsmeow proxy configured:', proxy.proxyHost, proxy.proxyPort);
+            }
+        } catch (error) {
+            console.error('Error setting whatsmeow proxy:', error);
+        }
+    }
+
     // ================================
     // Message Methods
     // ================================

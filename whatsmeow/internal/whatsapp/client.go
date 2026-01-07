@@ -46,6 +46,13 @@ type Instance struct {
 	SyncHistory  bool // Request full history sync on connect
 	ReadMessages bool // Auto mark messages as read
 
+	// Proxy configuration
+	ProxyHost     string
+	ProxyPort     string
+	ProxyUsername string
+	ProxyPassword string
+	ProxyProtocol string // http, https, socks4, socks5
+
 	mu sync.RWMutex
 }
 
@@ -1641,5 +1648,72 @@ func (m *Manager) GetSettings(instanceID string) map[string]bool {
 		"alwaysOnline": inst.AlwaysOnline,
 		"ignoreGroups": inst.IgnoreGroups,
 		"readMessages": inst.ReadMessages,
+	}
+}
+
+// SetProxy sets the proxy configuration for an instance
+func (m *Manager) SetProxy(instanceID string, host, port, username, password, protocol string) error {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return fmt.Errorf("instance not found")
+	}
+
+	inst.mu.Lock()
+	inst.ProxyHost = host
+	inst.ProxyPort = port
+	inst.ProxyUsername = username
+	inst.ProxyPassword = password
+	inst.ProxyProtocol = protocol
+	client := inst.Client
+	inst.mu.Unlock()
+
+	// Build proxy URL
+	proxyURL := m.buildProxyURL(host, port, username, password, protocol)
+
+	if proxyURL != "" && client != nil {
+		client.SetProxyAddress(proxyURL)
+		log.Info().Str("instanceId", instanceID).Str("proxy", host+":"+port).Msg("Proxy configured")
+	} else if proxyURL == "" && client != nil {
+		client.SetProxyAddress("")
+		log.Info().Str("instanceId", instanceID).Msg("Proxy disabled")
+	}
+
+	return nil
+}
+
+// buildProxyURL constructs the proxy URL from components
+func (m *Manager) buildProxyURL(host, port, username, password, protocol string) string {
+	if host == "" || port == "" {
+		return ""
+	}
+
+	// Default to socks5 if not specified
+	if protocol == "" {
+		protocol = "socks5"
+	}
+
+	var proxyURL string
+	if username != "" && password != "" {
+		proxyURL = fmt.Sprintf("%s://%s:%s@%s:%s", protocol, username, password, host, port)
+	} else {
+		proxyURL = fmt.Sprintf("%s://%s:%s", protocol, host, port)
+	}
+
+	return proxyURL
+}
+
+// GetProxy returns the current proxy configuration for an instance
+func (m *Manager) GetProxy(instanceID string) map[string]string {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return map[string]string{}
+	}
+	inst.mu.RLock()
+	defer inst.mu.RUnlock()
+	return map[string]string{
+		"proxyHost":     inst.ProxyHost,
+		"proxyPort":     inst.ProxyPort,
+		"proxyUsername": inst.ProxyUsername,
+		"proxyProtocol": inst.ProxyProtocol,
 	}
 }

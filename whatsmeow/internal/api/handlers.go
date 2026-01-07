@@ -218,6 +218,32 @@ func (h *Handlers) SetSettings(w http.ResponseWriter, r *http.Request) {
 	successResponse(w, h.manager.GetSettings(instanceID))
 }
 
+// SetProxy updates instance proxy configuration
+func (h *Handlers) SetProxy(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	instanceID := vars["id"]
+
+	var req struct {
+		ProxyHost     string `json:"proxyHost"`
+		ProxyPort     string `json:"proxyPort"`
+		ProxyUsername string `json:"proxyUsername"`
+		ProxyPassword string `json:"proxyPassword"`
+		ProxyProtocol string `json:"proxyProtocol"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	err := h.manager.SetProxy(instanceID, req.ProxyHost, req.ProxyPort, req.ProxyUsername, req.ProxyPassword, req.ProxyProtocol)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, h.manager.GetProxy(instanceID))
+}
+
 // GetQRCode gets QR code for instance
 func (h *Handlers) GetQRCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

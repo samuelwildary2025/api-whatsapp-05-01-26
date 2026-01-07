@@ -646,6 +646,15 @@ instance.patch('/:id/proxy', authMiddleware, async (c) => {
             },
         });
 
+        // Forward proxy config to whatsmeow
+        await waManager.setProxy(id, {
+            proxyHost: data.proxyHost || '',
+            proxyPort: data.proxyPort || '',
+            proxyUsername: data.proxyUsername || '',
+            proxyPassword: data.proxyPassword || '',
+            proxyProtocol: data.proxyProtocol || 'socks5',
+        });
+
         return c.json({
             success: true,
             data: updated,
