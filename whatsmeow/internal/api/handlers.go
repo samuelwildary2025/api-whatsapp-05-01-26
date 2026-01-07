@@ -362,8 +362,32 @@ func (h *Handlers) SendLocationMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement location sending
-	errorResponse(w, http.StatusNotImplemented, "Location sending not yet implemented")
+	if req.InstanceID == "" || req.To == "" {
+		errorResponse(w, http.StatusBadRequest, "instanceId and to are required")
+		return
+	}
+
+	// Clean phone number
+	to := cleanPhoneNumber(req.To)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("to", to).
+		Float64("lat", req.Latitude).
+		Float64("long", req.Longitude).
+		Msg("Sending location message")
+
+	messageID, err := h.manager.SendLocationMessage(req.InstanceID, to, req.Latitude, req.Longitude, req.Description)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send location message")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]interface{}{
+		"status":    "success",
+		"messageId": messageID,
+	})
 }
 
 // ============================================
@@ -386,6 +410,186 @@ func (h *Handlers) CheckNumber(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetGroups(w http.ResponseWriter, r *http.Request) {
 	// TODO: Implement
 	errorResponse(w, http.StatusNotImplemented, "Not yet implemented")
+}
+
+// ============================================
+// Poll, Edit, React, Delete Handlers
+// ============================================
+
+// SendPollRequest represents poll message request
+type SendPollRequest struct {
+	InstanceID      string   `json:"instanceId"`
+	To              string   `json:"to"`
+	Question        string   `json:"question"`
+	Options         []string `json:"options"`
+	SelectableCount int      `json:"selectableCount,omitempty"`
+}
+
+// SendPollMessage sends a poll message
+func (h *Handlers) SendPollMessage(w http.ResponseWriter, r *http.Request) {
+	var req SendPollRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.InstanceID == "" || req.To == "" || req.Question == "" || len(req.Options) < 2 {
+		errorResponse(w, http.StatusBadRequest, "instanceId, to, question, and at least 2 options are required")
+		return
+	}
+
+	// Default selectable count is 1 (single choice)
+	selectableCount := req.SelectableCount
+	if selectableCount <= 0 {
+		selectableCount = 1
+	}
+
+	to := cleanPhoneNumber(req.To)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("to", to).
+		Str("question", req.Question).
+		Int("options", len(req.Options)).
+		Msg("Sending poll message")
+
+	messageID, err := h.manager.SendPollMessage(req.InstanceID, to, req.Question, req.Options, selectableCount)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send poll message")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]interface{}{
+		"status":    "success",
+		"messageId": messageID,
+	})
+}
+
+// EditMessageRequest represents edit message request
+type EditMessageRequest struct {
+	InstanceID string `json:"instanceId"`
+	ChatID     string `json:"chatId"`
+	MessageID  string `json:"messageId"`
+	NewText    string `json:"newText"`
+}
+
+// EditMessage edits a previously sent message
+func (h *Handlers) EditMessage(w http.ResponseWriter, r *http.Request) {
+	var req EditMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.InstanceID == "" || req.ChatID == "" || req.MessageID == "" || req.NewText == "" {
+		errorResponse(w, http.StatusBadRequest, "instanceId, chatId, messageId, and newText are required")
+		return
+	}
+
+	chatID := cleanPhoneNumber(req.ChatID)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("chatId", chatID).
+		Str("messageId", req.MessageID).
+		Msg("Editing message")
+
+	newMsgID, err := h.manager.EditMessage(req.InstanceID, chatID, req.MessageID, req.NewText)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to edit message")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]interface{}{
+		"status":    "success",
+		"messageId": newMsgID,
+	})
+}
+
+// ReactMessageRequest represents reaction request
+type ReactMessageRequest struct {
+	InstanceID string `json:"instanceId"`
+	ChatID     string `json:"chatId"`
+	MessageID  string `json:"messageId"`
+	Reaction   string `json:"reaction"`
+}
+
+// ReactToMessage sends a reaction to a message
+func (h *Handlers) ReactToMessage(w http.ResponseWriter, r *http.Request) {
+	var req ReactMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.InstanceID == "" || req.ChatID == "" || req.MessageID == "" {
+		errorResponse(w, http.StatusBadRequest, "instanceId, chatId, and messageId are required")
+		return
+	}
+
+	chatID := cleanPhoneNumber(req.ChatID)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("chatId", chatID).
+		Str("messageId", req.MessageID).
+		Str("reaction", req.Reaction).
+		Msg("Sending reaction")
+
+	err := h.manager.ReactToMessage(req.InstanceID, chatID, req.MessageID, req.Reaction)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send reaction")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]string{
+		"status": "success",
+	})
+}
+
+// DeleteMessageRequest represents delete message request
+type DeleteMessageRequest struct {
+	InstanceID  string `json:"instanceId"`
+	ChatID      string `json:"chatId"`
+	MessageID   string `json:"messageId"`
+	ForEveryone bool   `json:"forEveryone"`
+}
+
+// DeleteMessage deletes a message
+func (h *Handlers) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	var req DeleteMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.InstanceID == "" || req.ChatID == "" || req.MessageID == "" {
+		errorResponse(w, http.StatusBadRequest, "instanceId, chatId, and messageId are required")
+		return
+	}
+
+	chatID := cleanPhoneNumber(req.ChatID)
+
+	log.Info().
+		Str("instanceId", req.InstanceID).
+		Str("chatId", chatID).
+		Str("messageId", req.MessageID).
+		Bool("forEveryone", req.ForEveryone).
+		Msg("Deleting message")
+
+	err := h.manager.DeleteMessage(req.InstanceID, chatID, req.MessageID, req.ForEveryone)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to delete message")
+		errorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	successResponse(w, map[string]string{
+		"status": "success",
+	})
 }
 
 // ============================================

@@ -478,10 +478,72 @@ class WhatsAppBridge extends EventEmitter {
             }),
         });
     }
-    async sendPoll(_i: string, _t: string, _ti: string, _o: string[], _po?: object) { throw new Error('Not implemented'); }
-    async editMessage(_i: string, _m: string, _n: string) { throw new Error('Not implemented'); }
-    async reactToMessage(_i: string, _m: string, _r: string) { throw new Error('Not implemented'); }
-    async deleteMessage(_i: string, _m: string, _f?: boolean) { throw new Error('Not implemented'); }
+    async sendPoll(instanceId: string, to: string, title: string, options: string[], pollOptions?: { allowMultipleAnswers?: boolean }) {
+        const cleanedNumber = to.replace(/\D/g, '');
+        const selectableCount = pollOptions?.allowMultipleAnswers ? options.length : 1;
+
+        const data = await this.request<Record<string, unknown>>('/message/poll', {
+            method: 'POST',
+            body: JSON.stringify({
+                instanceId,
+                to: cleanedNumber,
+                question: title,
+                options,
+                selectableCount,
+            }),
+        });
+
+        return {
+            id: data.messageId as string,
+            to: cleanedNumber,
+            type: 'poll',
+            fromMe: true,
+        };
+    }
+
+    async editMessage(instanceId: string, messageId: string, newText: string) {
+        // Note: editMessage needs chatId - we'll extract from messageId if possible
+        // For now, we expect the frontend to pass the chatId separately or it's encoded in messageId
+        const data = await this.request<Record<string, unknown>>('/message/edit', {
+            method: 'POST',
+            body: JSON.stringify({
+                instanceId,
+                chatId: messageId.split('_')[0] || '', // Extract chatId from messageId format
+                messageId,
+                newText,
+            }),
+        });
+
+        return {
+            id: data.messageId as string,
+        };
+    }
+
+    async reactToMessage(instanceId: string, messageId: string, reaction: string) {
+        // Similar to edit - need chatId
+        await this.request<void>('/message/react', {
+            method: 'POST',
+            body: JSON.stringify({
+                instanceId,
+                chatId: messageId.split('_')[0] || '',
+                messageId,
+                reaction,
+            }),
+        });
+    }
+
+    async deleteMessage(instanceId: string, messageId: string, forEveryone?: boolean) {
+        await this.request<void>('/message/delete', {
+            method: 'POST',
+            body: JSON.stringify({
+                instanceId,
+                chatId: messageId.split('_')[0] || '',
+                messageId,
+                forEveryone: forEveryone ?? true,
+            }),
+        });
+    }
+
     async downloadMedia(_i: string, _m: string, _o?: object) { throw new Error('Not implemented'); }
     async getContacts(_i: string) { return []; }
     async getContactById(_i: string, _c: string) { throw new Error('Not implemented'); }

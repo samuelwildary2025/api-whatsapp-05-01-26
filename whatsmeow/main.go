@@ -69,6 +69,10 @@ func main() {
 	router.HandleFunc("/message/media", handlers.SendMediaMessage).Methods("POST")
 	router.HandleFunc("/message/presence", handlers.SendPresence).Methods("POST")
 	router.HandleFunc("/message/location", handlers.SendLocationMessage).Methods("POST")
+	router.HandleFunc("/message/poll", handlers.SendPollMessage).Methods("POST")
+	router.HandleFunc("/message/edit", handlers.EditMessage).Methods("POST")
+	router.HandleFunc("/message/react", handlers.ReactToMessage).Methods("POST")
+	router.HandleFunc("/message/delete", handlers.DeleteMessage).Methods("POST")
 
 	// Contact routes
 	router.HandleFunc("/contacts/{instanceId}", handlers.GetContacts).Methods("GET")

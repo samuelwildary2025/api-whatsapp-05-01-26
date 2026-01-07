@@ -907,6 +907,253 @@ func (m *Manager) SendMediaMessage(instanceID, to, mediaUrl, caption, mediaType 
 	return sentResp.ID, nil
 }
 
+// SendLocationMessage sends a location message
+func (m *Manager) SendLocationMessage(instanceID, to string, latitude, longitude float64, description string) (string, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return "", fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	inst.mu.RUnlock()
+
+	if status != "connected" {
+		return "", fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number
+	to = strings.TrimPrefix(to, "+")
+	to = strings.ReplaceAll(to, " ", "")
+	to = strings.ReplaceAll(to, "-", "")
+
+	// Ensure it has @s.whatsapp.net suffix
+	if !strings.Contains(to, "@") {
+		to = to + "@s.whatsapp.net"
+	}
+
+	jid, err := types.ParseJID(to)
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	msg := &waE2E.Message{
+		LocationMessage: &waE2E.LocationMessage{
+			DegreesLatitude:  proto.Float64(latitude),
+			DegreesLongitude: proto.Float64(longitude),
+			Name:             proto.String(description),
+			Address:          proto.String(description),
+		},
+	}
+
+	log.Info().
+		Str("instanceId", instanceID).
+		Str("to", to).
+		Float64("lat", latitude).
+		Float64("long", longitude).
+		Msg("Sending location message")
+
+	sentResp, err := inst.Client.SendMessage(context.Background(), jid, msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to send location: %w", err)
+	}
+
+	return sentResp.ID, nil
+}
+
+// SendPollMessage sends a poll message
+func (m *Manager) SendPollMessage(instanceID, to, question string, options []string, selectableCount int) (string, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return "", fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	inst.mu.RUnlock()
+
+	if status != "connected" {
+		return "", fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number
+	to = strings.TrimPrefix(to, "+")
+	to = strings.ReplaceAll(to, " ", "")
+	to = strings.ReplaceAll(to, "-", "")
+
+	// Ensure it has @s.whatsapp.net suffix
+	if !strings.Contains(to, "@") {
+		to = to + "@s.whatsapp.net"
+	}
+
+	jid, err := types.ParseJID(to)
+	if err != nil {
+		return "", fmt.Errorf("invalid JID: %w", err)
+	}
+
+	// Create poll message
+	pollMsg := inst.Client.BuildPollCreation(question, options, selectableCount)
+
+	log.Info().
+		Str("instanceId", instanceID).
+		Str("to", to).
+		Str("question", question).
+		Int("options", len(options)).
+		Msg("Sending poll message")
+
+	sentResp, err := inst.Client.SendMessage(context.Background(), jid, pollMsg)
+	if err != nil {
+		return "", fmt.Errorf("failed to send poll: %w", err)
+	}
+
+	return sentResp.ID, nil
+}
+
+// EditMessage edits a previously sent message
+func (m *Manager) EditMessage(instanceID, chatID, messageID, newText string) (string, error) {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return "", fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	inst.mu.RUnlock()
+
+	if status != "connected" {
+		return "", fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number / chat ID
+	chatID = strings.TrimPrefix(chatID, "+")
+	chatID = strings.ReplaceAll(chatID, " ", "")
+	chatID = strings.ReplaceAll(chatID, "-", "")
+
+	if !strings.Contains(chatID, "@") {
+		chatID = chatID + "@s.whatsapp.net"
+	}
+
+	chatJID, err := types.ParseJID(chatID)
+	if err != nil {
+		return "", fmt.Errorf("invalid chat JID: %w", err)
+	}
+
+	// Build edit message
+	editMsg := inst.Client.BuildEdit(chatJID, messageID, &waE2E.Message{
+		Conversation: proto.String(newText),
+	})
+
+	log.Info().
+		Str("instanceId", instanceID).
+		Str("chatId", chatID).
+		Str("messageId", messageID).
+		Msg("Editing message")
+
+	sentResp, err := inst.Client.SendMessage(context.Background(), chatJID, editMsg)
+	if err != nil {
+		return "", fmt.Errorf("failed to edit message: %w", err)
+	}
+
+	return sentResp.ID, nil
+}
+
+// ReactToMessage sends a reaction to a message
+func (m *Manager) ReactToMessage(instanceID, chatID, messageID, reaction string) error {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	inst.mu.RUnlock()
+
+	if status != "connected" {
+		return fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number / chat ID
+	chatID = strings.TrimPrefix(chatID, "+")
+	chatID = strings.ReplaceAll(chatID, " ", "")
+	chatID = strings.ReplaceAll(chatID, "-", "")
+
+	if !strings.Contains(chatID, "@") {
+		chatID = chatID + "@s.whatsapp.net"
+	}
+
+	chatJID, err := types.ParseJID(chatID)
+	if err != nil {
+		return fmt.Errorf("invalid chat JID: %w", err)
+	}
+
+	log.Info().
+		Str("instanceId", instanceID).
+		Str("chatId", chatID).
+		Str("messageId", messageID).
+		Str("reaction", reaction).
+		Msg("Sending reaction")
+
+	// Build reaction using whatsmeow's method
+	_, err = inst.Client.SendMessage(context.Background(), chatJID, inst.Client.BuildReaction(chatJID, types.EmptyJID, messageID, reaction))
+	if err != nil {
+		return fmt.Errorf("failed to send reaction: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteMessage deletes a message (revoke)
+func (m *Manager) DeleteMessage(instanceID, chatID, messageID string, forEveryone bool) error {
+	inst, ok := m.GetInstance(instanceID)
+	if !ok {
+		return fmt.Errorf("instance not found")
+	}
+
+	inst.mu.RLock()
+	status := inst.Status
+	inst.mu.RUnlock()
+
+	if status != "connected" {
+		return fmt.Errorf("instance not connected")
+	}
+
+	// Clean phone number / chat ID
+	chatID = strings.TrimPrefix(chatID, "+")
+	chatID = strings.ReplaceAll(chatID, " ", "")
+	chatID = strings.ReplaceAll(chatID, "-", "")
+
+	if !strings.Contains(chatID, "@") {
+		chatID = chatID + "@s.whatsapp.net"
+	}
+
+	chatJID, err := types.ParseJID(chatID)
+	if err != nil {
+		return fmt.Errorf("invalid chat JID: %w", err)
+	}
+
+	log.Info().
+		Str("instanceId", instanceID).
+		Str("chatId", chatID).
+		Str("messageId", messageID).
+		Bool("forEveryone", forEveryone).
+		Msg("Deleting message")
+
+	if forEveryone {
+		// Revoke for everyone
+		revokeMsg := inst.Client.BuildRevoke(chatJID, types.EmptyJID, messageID)
+		_, err = inst.Client.SendMessage(context.Background(), chatJID, revokeMsg)
+	} else {
+		// Delete for me only - uses a different method
+		_, err = inst.Client.SendMessage(context.Background(), chatJID, inst.Client.BuildRevoke(chatJID, inst.Client.Store.ID.ToNonAD(), messageID))
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to delete message: %w", err)
+	}
+
+	return nil
+}
+
 // Subscribe to events for an instance
 func (m *Manager) Subscribe(instanceID string) chan Event {
 	m.eventSubsMu.Lock()
